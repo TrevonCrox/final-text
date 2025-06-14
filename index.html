@@ -2,96 +2,121 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Event Frame Upload</title>
   <style>
     body {
-      background-color: #111;
-      color: #fff;
-      text-align: center;
+      background: #111;
+      color: white;
       font-family: sans-serif;
+      text-align: center;
+      padding: 20px;
     }
-    canvas {
-      margin-top: 20px;
-      border: 1px solid #444;
+
+    h2 {
+      font-size: 1.5rem;
+      margin-bottom: 10px;
     }
-    #downloadBtn {
-      margin-top: 20px;
-      padding: 10px 20px;
-      background: #28a745;
-      color: #fff;
+
+    input[type="file"],
+    button {
+      margin: 10px auto;
+      font-size: 1rem;
+      padding: 10px;
+      border-radius: 6px;
       border: none;
-      border-radius: 5px;
-      font-size: 16px;
+    }
+
+    #canvas-container {
+      max-width: 100%;
+      overflow: auto;
+      margin: 0 auto;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      max-width: 500px;
+      border: 1px solid #333;
+      background: #000;
+      margin-top: 20px;
+    }
+
+    button {
+      background: #ffc107;
+      color: #000;
+      font-weight: bold;
       cursor: pointer;
     }
+
+    button:hover {
+      background: #e0a800;
+    }
   </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
 </head>
 <body>
-  <h1>Upload Your Image</h1>
-  <input type="file" id="uploadInput" accept="image/*" />
-  <br>
-  <canvas id="canvas" width="1080" height="1350"></canvas>
-  <br>
-  <button id="downloadBtn">Download My Framed Poster</button>
+  <h2>Upload Your Image</h2>
+  <input type="file" id="imageUpload" accept="image/*" />
+  <div id="canvas-container">
+    <canvas id="canvas" width="1080" height="1350"></canvas>
+  </div>
+  <button onclick="downloadImage()">Download</button>
 
   <script>
-    const uploadInput = document.getElementById('uploadInput');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const frameImg = new Image();
+    frameImg.src = "poster_frame.png"; // Ensure this is the right filename and in same folder
 
-    const frame = new Image();
-    frame.src = 'poster_frame.png'; // must be in the same folder
+    // Load face-api models
+    Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri("https://cdn.jsdelivr.net/npm/face-api.js/weights"),
+    ]).then(() => console.log("FaceAPI ready"));
 
-    uploadInput.addEventListener('change', function () {
+    document.getElementById("imageUpload").addEventListener("change", async function () {
       const file = this.files[0];
       if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const uploadedImg = new Image();
-        uploadedImg.onload = function () {
-          // Clear canvas
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const img = new Image();
+      img.onload = async () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-          // Fill with black background
-          ctx.fillStyle = '#000';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        let drawX = 0,
+          drawY = 0,
+          drawWidth = canvas.width,
+          drawHeight = canvas.height;
 
-          // Scale image to fit in the circular area around (540, 540)
-          const frameCenterX = 540;
-          const frameCenterY = 540;
-          const targetRadius = 250;
+        const detection = await faceapi.detectSingleFace(
+          img,
+          new faceapi.TinyFaceDetectorOptions()
+        );
 
-          // Compute scale to make image fit nicely inside the circle (zoomed out a bit)
-          let scale = Math.min(500 / uploadedImg.width, 500 / uploadedImg.height);
-          const imgWidth = uploadedImg.width * scale;
-          const imgHeight = uploadedImg.height * scale;
+        if (detection) {
+          const { x, y, width, height } = detection.box;
+          const faceCenterX = x + width / 2;
+          const faceCenterY = y + height / 2;
 
-          const drawX = frameCenterX - imgWidth / 2;
-          const drawY = frameCenterY - imgHeight / 2;
+          const scale = 2.5;
+          drawWidth = img.width / scale;
+          drawHeight = img.height / scale;
+          drawX = faceCenterX - drawWidth / 2;
+          drawY = faceCenterY - drawHeight / 2;
+        }
 
-          ctx.drawImage(uploadedImg, drawX, drawY, imgWidth, imgHeight);
-
-          // Draw the frame over it
-          frame.onload = () => {
-            ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
-          };
-          if (frame.complete) {
-            ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
-          }
-        };
-        uploadedImg.src = e.target.result;
+        ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight, 290, 265, 500, 500);
+        ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
       };
-      reader.readAsDataURL(file);
+
+      img.src = URL.createObjectURL(file);
     });
 
-    // Download button
-    document.getElementById('downloadBtn').addEventListener('click', function () {
-      const link = document.createElement('a');
-      link.download = 'my_event_poster.png';
-      link.href = canvas.toDataURL('image/png');
+    function downloadImage() {
+      const link = document.createElement("a");
+      link.download = "framed-image.png";
+      link.href = canvas.toDataURL();
       link.click();
-    });
+    }
   </script>
 </body>
 </html>
