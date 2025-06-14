@@ -12,69 +12,48 @@
       text-align: center;
       padding: 20px;
     }
-
-    h2 {
-      font-size: 1.5rem;
-      margin-bottom: 10px;
-    }
-
-    input[type="file"],
-    button {
+    input[type="file"], button {
       margin: 10px auto;
       font-size: 1rem;
       padding: 10px;
       border-radius: 6px;
       border: none;
     }
-
-    #canvas-container {
-      max-width: 100%;
-      overflow: auto;
-      margin: 0 auto;
-    }
-
     canvas {
       width: 100%;
-      height: auto;
       max-width: 500px;
-      border: 1px solid #333;
+      height: auto;
       background: #000;
       margin-top: 20px;
       touch-action: none;
     }
-
     button {
       background: #ffc107;
       color: #000;
       font-weight: bold;
       cursor: pointer;
     }
-
-    button:hover {
-      background: #e0a800;
-    }
   </style>
 </head>
 <body>
   <h2>Upload Your Image</h2>
   <input type="file" id="imageUpload" accept="image/*" />
-  <div id="canvas-container">
-    <canvas id="canvas" width="1080" height="1350"></canvas>
-  </div>
+  <canvas id="canvas" width="1080" height="1350"></canvas>
+  <br />
   <button onclick="downloadImage()">Download</button>
 
   <script>
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
-
     const frameImg = new Image();
-    frameImg.src = "poster_frame.png";
+    frameImg.src = "poster_frame.png"; // Must match your file name
 
     let uploadedImg = null;
     let imgX = 290, imgY = 265;
     let scale = 1;
     let dragging = false;
     let dragStart = { x: 0, y: 0 };
+    let imgWidth = 500, imgHeight = 500;
 
     document.getElementById("imageUpload").addEventListener("change", function () {
       const file = this.files[0];
@@ -91,16 +70,24 @@
       img.src = URL.createObjectURL(file);
     });
 
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (uploadedImg) {
+        const drawWidth = imgWidth * scale;
+        const drawHeight = imgHeight * scale;
+        ctx.drawImage(uploadedImg, imgX, imgY, drawWidth, drawHeight);
+      }
+      ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+    }
+
+    // Mouse Drag
     canvas.addEventListener("mousedown", (e) => {
       dragging = true;
       dragStart.x = e.offsetX;
       dragStart.y = e.offsetY;
     });
-
-    canvas.addEventListener("mouseup", () => {
-      dragging = false;
-    });
-
+    canvas.addEventListener("mouseup", () => dragging = false);
+    canvas.addEventListener("mouseleave", () => dragging = false);
     canvas.addEventListener("mousemove", (e) => {
       if (dragging && uploadedImg) {
         const dx = e.offsetX - dragStart.x;
@@ -113,29 +100,57 @@
       }
     });
 
+    // Scroll to Zoom (Desktop)
     canvas.addEventListener("wheel", (e) => {
-      if (uploadedImg) {
-        e.preventDefault();
-        scale += e.deltaY * -0.001;
-        scale = Math.max(0.3, Math.min(3, scale)); // clamp zoom
+      if (!uploadedImg) return;
+      e.preventDefault();
+      scale += e.deltaY * -0.001;
+      scale = Math.max(0.3, Math.min(3, scale));
+      draw();
+    });
+
+    // Touch Support (Mobile)
+    let lastDistance = null;
+    canvas.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 1) {
+        dragStart.x = e.touches[0].clientX;
+        dragStart.y = e.touches[0].clientY;
+      } else if (e.touches.length === 2) {
+        lastDistance = getTouchDistance(e.touches);
+      }
+    });
+
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      if (!uploadedImg) return;
+      if (e.touches.length === 1) {
+        const dx = e.touches[0].clientX - dragStart.x;
+        const dy = e.touches[0].clientY - dragStart.y;
+        imgX += dx;
+        imgY += dy;
+        dragStart.x = e.touches[0].clientX;
+        dragStart.y = e.touches[0].clientY;
+        draw();
+      } else if (e.touches.length === 2) {
+        const newDistance = getTouchDistance(e.touches);
+        const zoom = newDistance / lastDistance;
+        scale *= zoom;
+        scale = Math.max(0.3, Math.min(3, scale));
+        lastDistance = newDistance;
         draw();
       }
     });
 
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (uploadedImg) {
-        const drawWidth = 500 * scale;
-        const drawHeight = 500 * scale;
-        ctx.drawImage(uploadedImg, imgX, imgY, drawWidth, drawHeight);
-      }
-      ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+    function getTouchDistance(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
     }
 
     function downloadImage() {
       const link = document.createElement("a");
       link.download = "framed-image.png";
-      link.href = canvas.toDataURL();
+      link.href = canvas.toDataURL("image/png");
       link.click();
     }
   </script>
