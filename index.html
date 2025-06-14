@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DP Frame Generator</title>
+  <style>
+    body {
+      text-align: center;
+      background-color: #111;
+      color: white;
+      font-family: sans-serif;
+    }
+    canvas {
+      margin-top: 20px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h2>Upload Your Image</h2>
+  <input type="file" id="upload" accept="image/*" />
+  <br />
+  <canvas id="canvas" width="1080" height="1350"></canvas>
+  <br />
+  <a id="download" href="#" download="framed_dp.png">Download Image</a>
+
+  <!-- Load face-api.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const upload = document.getElementById('upload');
+    const download = document.getElementById('download');
+    const frameImage = new Image();
+    frameImage.src = 'poster_frame.png'; // Must match your GitHub image file name
+
+    // Load face-api models
+    Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models')
+    ]).then(() => console.log('FaceAPI loaded'));
+
+    upload.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = await createImageBitmap(file);
+
+      // Create an offscreen canvas to analyze
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = img.width;
+      offCanvas.height = img.height;
+      const offCtx = offCanvas.getContext('2d');
+      offCtx.drawImage(img, 0, 0);
+
+      // Detect face
+      const detections = await faceapi.detectSingleFace(offCanvas, new faceapi.TinyFaceDetectorOptions());
+      let sx = 0, sy = 0, sw = img.width, sh = img.height;
+
+      if (detections) {
+        const box = detections.box;
+        const faceCenterX = box.x + box.width / 2;
+        const faceCenterY = box.y + box.height / 2;
+
+        // Try to zoom out slightly and center face
+        const cropSize = Math.max(box.width, box.height) * 3.2; // Zoom out a bit
+        sx = Math.max(0, faceCenterX - cropSize / 2);
+        sy = Math.max(0, faceCenterY - cropSize / 2);
+        sw = sh = cropSize;
+
+        // Clamp to image dimensions
+        if (sx + sw > img.width) sx = img.width - sw;
+        if (sy + sh > img.height) sy = img.height - sh;
+        sx = Math.max(0, sx);
+        sy = Math.max(0, sy);
+      }
+
+      // Clear and draw background white
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw user image inside the center circle region (approx)
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(540, 540, 250, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(img, sx, sy, sw, sh, 290, 290, 500, 500); // Draw centered image
+      ctx.restore();
+
+      // Draw the golden frame on top
+      frameImage.onload = () => {
+        ctx.drawImage(frameImage, 0, 0, 1080, 1350);
+        updateDownload();
+      };
+
+      // If already loaded
+      if (frameImage.complete) {
+        ctx.drawImage(frameImage, 0, 0, 1080, 1350);
+        updateDownload();
+      }
+    });
+
+    function updateDownload() {
+      download.href = canvas.toDataURL();
+    }
+  </script>
+</body>
+</html>
