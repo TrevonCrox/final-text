@@ -1,103 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
   <title>Event Frame Upload</title>
   <style>
     body {
       background: #111;
       color: white;
-      font-family: sans-serif;
       text-align: center;
-      padding: 20px;
+      font-family: sans-serif;
     }
-
-    h2 {
-      font-size: 1.5rem;
-      margin-bottom: 10px;
-    }
-
-    input[type="file"],
-    button {
-      margin: 10px auto;
-      font-size: 1rem;
-      padding: 10px;
-      border-radius: 6px;
-      border: none;
-    }
-
-    #canvas-container {
-      max-width: 100%;
-      overflow: auto;
-      margin: 0 auto;
-    }
-
     canvas {
-      width: 100%;
-      height: auto;
-      max-width: 500px;
-      border: 1px solid #333;
-      background: #000;
       margin-top: 20px;
+      border: 1px solid #444;
     }
-
-    button {
-      background: #ffc107;
-      color: #000;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #e0a800;
+    input, button {
+      margin: 10px;
     }
   </style>
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
 </head>
 <body>
   <h2>Upload Your Image</h2>
-  <input type="file" id="imageUpload" accept="image/*" />
-  <div id="canvas-container">
-    <canvas id="canvas" width="1080" height="1350"></canvas>
-  </div>
+  <input type="file" id="imageUpload">
+  <br>
+  <canvas id="canvas" width="1080" height="1350"></canvas>
+  <br>
   <button onclick="downloadImage()">Download</button>
 
   <script>
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
     const frameImg = new Image();
-    frameImg.src = "poster_frame.png"; // Ensure this is the right filename and in same folder
+    frameImg.src = 'poster_frame.png'; // Your frame with circular hole
+    const imageUpload = document.getElementById('imageUpload');
 
-    // Load face-api models
+    // Load models for face detection
     Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri("https://cdn.jsdelivr.net/npm/face-api.js/weights"),
-    ]).then(() => console.log("FaceAPI ready"));
+      faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/weights'),
+    ]).then(() => console.log("FaceAPI models loaded."));
 
-    document.getElementById("imageUpload").addEventListener("change", async function () {
+    imageUpload.addEventListener('change', async function () {
       const file = this.files[0];
       if (!file) return;
 
       const img = new Image();
       img.onload = async () => {
+        // Detect face
+        const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions());
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        let drawX = 0,
-          drawY = 0,
-          drawWidth = canvas.width,
-          drawHeight = canvas.height;
-
-        const detection = await faceapi.detectSingleFace(
-          img,
-          new faceapi.TinyFaceDetectorOptions()
-        );
+        let drawX = 0, drawY = 0, drawWidth = canvas.width, drawHeight = canvas.height;
 
         if (detection) {
           const { x, y, width, height } = detection.box;
           const faceCenterX = x + width / 2;
           const faceCenterY = y + height / 2;
 
-          const scale = 2.5;
+          // Calculate scale and crop to fit the circle better
+          const scale = 2.5; // Adjust zoom here
           drawWidth = img.width / scale;
           drawHeight = img.height / scale;
           drawX = faceCenterX - drawWidth / 2;
@@ -107,13 +69,12 @@
         ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight, 290, 265, 500, 500);
         ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
       };
-
       img.src = URL.createObjectURL(file);
     });
 
     function downloadImage() {
-      const link = document.createElement("a");
-      link.download = "framed-image.png";
+      const link = document.createElement('a');
+      link.download = 'framed-image.png';
       link.href = canvas.toDataURL();
       link.click();
     }
