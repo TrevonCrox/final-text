@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Event Frame Upload</title>
   <style>
     body {
-      background: #111;
-      color: white;
+      background-color: #111;
+      color: #fff;
       text-align: center;
       font-family: sans-serif;
     }
@@ -14,70 +14,84 @@
       margin-top: 20px;
       border: 1px solid #444;
     }
-    input, button {
-      margin: 10px;
+    #downloadBtn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background: #28a745;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
     }
   </style>
-  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
 </head>
 <body>
-  <h2>Upload Your Image</h2>
-  <input type="file" id="imageUpload">
+  <h1>Upload Your Image</h1>
+  <input type="file" id="uploadInput" accept="image/*" />
   <br>
   <canvas id="canvas" width="1080" height="1350"></canvas>
   <br>
-  <button onclick="downloadImage()">Download</button>
+  <button id="downloadBtn">Download My Framed Poster</button>
 
   <script>
+    const uploadInput = document.getElementById('uploadInput');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const frameImg = new Image();
-    frameImg.src = 'poster_frame.png'; // Your frame with circular hole
-    const imageUpload = document.getElementById('imageUpload');
 
-    // Load models for face detection
-    Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/weights'),
-    ]).then(() => console.log("FaceAPI models loaded."));
+    const frame = new Image();
+    frame.src = 'poster_frame.png'; // must be in the same folder
 
-    imageUpload.addEventListener('change', async function () {
+    uploadInput.addEventListener('change', function () {
       const file = this.files[0];
       if (!file) return;
 
-      const img = new Image();
-      img.onload = async () => {
-        // Detect face
-        const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions());
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const uploadedImg = new Image();
+        uploadedImg.onload = function () {
+          // Clear canvas
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+          // Fill with black background
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        let drawX = 0, drawY = 0, drawWidth = canvas.width, drawHeight = canvas.height;
+          // Scale image to fit in the circular area around (540, 540)
+          const frameCenterX = 540;
+          const frameCenterY = 540;
+          const targetRadius = 250;
 
-        if (detection) {
-          const { x, y, width, height } = detection.box;
-          const faceCenterX = x + width / 2;
-          const faceCenterY = y + height / 2;
+          // Compute scale to make image fit nicely inside the circle (zoomed out a bit)
+          let scale = Math.min(500 / uploadedImg.width, 500 / uploadedImg.height);
+          const imgWidth = uploadedImg.width * scale;
+          const imgHeight = uploadedImg.height * scale;
 
-          // Calculate scale and crop to fit the circle better
-          const scale = 2.5; // Adjust zoom here
-          drawWidth = img.width / scale;
-          drawHeight = img.height / scale;
-          drawX = faceCenterX - drawWidth / 2;
-          drawY = faceCenterY - drawHeight / 2;
-        }
+          const drawX = frameCenterX - imgWidth / 2;
+          const drawY = frameCenterY - imgHeight / 2;
 
-        ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight, 290, 265, 500, 500);
-        ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+          ctx.drawImage(uploadedImg, drawX, drawY, imgWidth, imgHeight);
+
+          // Draw the frame over it
+          frame.onload = () => {
+            ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+          };
+          if (frame.complete) {
+            ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+          }
+        };
+        uploadedImg.src = e.target.result;
       };
-      img.src = URL.createObjectURL(file);
+      reader.readAsDataURL(file);
     });
 
-    function downloadImage() {
+    // Download button
+    document.getElementById('downloadBtn').addEventListener('click', function () {
       const link = document.createElement('a');
-      link.download = 'framed-image.png';
-      link.href = canvas.toDataURL();
+      link.download = 'my_event_poster.png';
+      link.href = canvas.toDataURL('image/png');
       link.click();
-    }
+    });
   </script>
 </body>
 </html>
